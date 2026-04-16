@@ -1,11 +1,6 @@
 name: HKEx Monitor (港交所)
 
 on:
-  schedule:
-    # 每 30 分鐘執行一次，涵蓋 HKT 08:00–23:30（UTC 00:00–15:30）
-    # 每天（包含週末）
-    - cron: "0 0-15 * * *"
-    - cron: "30 0-15 * * *"
   workflow_dispatch: {}   # 允許手動觸發
 
 permissions:
