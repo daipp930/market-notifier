@@ -1,0 +1,36 @@
+name: SSE Monitor (上交所)
+
+on:
+  schedule:
+    # 每 30 分鐘執行一次，涵蓋 HKT 08:20–23:50（UTC 00:20–15:50）
+    # 每天（包含週末）
+    - cron: "20 0-15 * * *"
+    - cron: "50 0-15 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  run-monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run SSE monitor
+        env:
+          GEMINI_API_KEY:       ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN:   ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:     ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python sse_monitor.py
