@@ -1,0 +1,38 @@
+name: HKEx Monitor (港交所)
+
+on:
+  schedule:
+    # 每 30 分鐘執行一次，設在每小時的第 0 和第 30 分
+    # 時區為 UTC；港股交易時段 09:00–17:00 HKT = 01:00–09:00 UTC
+    - cron: "0 1-9 * * 1-5"
+    - cron: "30 1-9 * * 1-5"
+  workflow_dispatch: {}   # 允許手動觸發
+
+permissions:
+  contents: write         # 允許腳本將更新後的 .json 寫回倉庫
+
+jobs:
+  run-monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15   # 防止卡死
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install chromium --with-deps
+
+      - name: Run HKEx monitor
+        env:
+          GEMINI_API_KEY:       ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN:   ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:     ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python main.py
