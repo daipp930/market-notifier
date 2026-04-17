@@ -222,7 +222,7 @@ def fetch_szse_announcements() -> list[dict]:
 
     logger.error("深交所 API 三次嘗試均失敗。")
     return announcements
-
+    
 # ── 報告生成 ───────────────────────────────────────────────────────────────────
 def extract_report_body(raw: str, company_name: str, fallback: str) -> str:
     lines     = [l.strip() for l in raw.splitlines() if l.strip()]
