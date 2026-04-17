@@ -1,4 +1,3 @@
-test_sse
 """
 test_sse.py
 臨時診斷腳本：測試上交所各 API 端點的連線狀況與回傳結構。
@@ -21,8 +20,6 @@ headers = {
     "X-Requested-With": "XMLHttpRequest",
 }
 
-# ── 三個待測端點 ────────────────────────────────────────────────────────────────
-
 endpoints = [
     {
         "label":  "端點一：queryCompanyBulletin.do（原本腳本）",
@@ -36,7 +33,6 @@ endpoints = [
             "pageHelp.beginPage": 1,
             "pageHelp.endPage":   5,
         },
-        "json": None,
     },
     {
         "label":  "端點二：searchResult.do（主站搜尋）",
@@ -50,10 +46,9 @@ endpoints = [
             "start":   0,
             "sort":    "relevant",
         },
-        "json": None,
     },
     {
-        "label":  "端點三：disclosure/listedinfo GET",
+        "label":  "端點三：commonSoaQuery.do",
         "method": "GET",
         "url":    "https://query.sse.com.cn/commonSoaQuery.do",
         "params": {
@@ -63,86 +58,64 @@ endpoints = [
             "pageHelp.pageSize": 25,
             "NOTICE_TITLE":      "发行H股",
         },
-        "json": None,
     },
 ]
 
-# ── 輔助函數：遞迴展示 JSON 結構 ───────────────────────────────────────────────
 
-def inspect(data, depth=0, max_depth=4):
+def inspect(data, depth=0, max_depth=3):
     indent = "  " * depth
     if depth > max_depth:
-        print(f"{indent}（層級過深，截斷）")
+        print(indent + "（層級過深，截斷）")
         return
-
     if isinstance(data, dict):
-        print(f"{indent}dict，Keys: {list(data.keys())}")
+        print(indent + "dict，Keys: " + str(list(data.keys())))
         for k, v in data.items():
-            print(f"{indent}  [{k}]：", end="")
             if isinstance(v, list):
-                print(f"list，共 {len(v)} 筆")
+                print(indent + "  [" + k + "]：list，共 " + str(len(v)) + " 筆")
                 if v and isinstance(v[0], dict):
-                    print(f"{indent}    第一筆欄位：{list(v[0].keys())}")
-                    print(f"{indent}    第一筆內容：")
-                    print(json.dumps(v[0], ensure_ascii=False, indent=2)
-                          .replace("\n", f"\n{indent}    "))
+                    print(indent + "    第一筆欄位：" + str(list(v[0].keys())))
+                    print(indent + "    第一筆內容：")
+                    print(json.dumps(v[0], ensure_ascii=False, indent=2))
             elif isinstance(v, dict):
-                print(f"dict")
+                print(indent + "  [" + k + "]：dict")
                 inspect(v, depth + 2)
             else:
                 val_str = str(v)
-                print(val_str[:120] + ("…" if len(val_str) > 120 else ""))
+                print(indent + "  [" + k + "]：" + val_str[:120])
     elif isinstance(data, list):
-        print(f"{indent}直接是 list，共 {len(data)} 筆")
+        print(indent + "直接是 list，共 " + str(len(data)) + " 筆")
         if data and isinstance(data[0], dict):
-            print(f"{indent}  第一筆欄位：{list(data[0].keys())}")
-            print(f"{indent}  第一筆內容：")
+            print(indent + "  第一筆欄位：" + str(list(data[0].keys())))
+            print(indent + "  第一筆內容：")
             print(json.dumps(data[0], ensure_ascii=False, indent=2))
     else:
-        print(f"{indent}{type(data).__name__}: {str(data)[:200]}")
+        print(indent + str(type(data).__name__) + ": " + str(data)[:200])
 
-
-# ── 主測試迴圈 ─────────────────────────────────────────────────────────────────
 
 for ep in endpoints:
-    print("\n" + "=" * 60)
-    print(f"測試 {ep['label']}")
-    print(f"URL: {ep['url']}")
+    print("")
+    print("=" * 60)
+    print("測試 " + ep["label"])
+    print("URL: " + ep["url"])
     try:
-        if ep["method"] == "GET":
-            resp = requests.get(
-                ep["url"],
-                params=ep["params"],
-                headers=headers,
-                timeout=30,
-            )
-        else:
-            resp = requests.post(
-                ep["url"],
-                json=ep["json"],
-                headers=headers,
-                timeout=30,
-            )
-
-        print(f"HTTP 狀態碼: {resp.status_code}")
-        print(f"原始回應前 600 字:\n{resp.text[:600]}")
-        print()
-
+        resp = requests.get(ep["url"], params=ep["params"], headers=headers, timeout=30)
+        print("HTTP 狀態碼: " + str(resp.status_code))
+        print("原始回應前 600 字:")
+        print(resp.text[:600])
+        print("")
         if resp.status_code != 200:
             print("非 200，跳過 JSON 解析。")
-            continue
-
-        try:
-            data = resp.json()
-            print("── JSON 結構分析 ──")
-            inspect(data)
-        except Exception as e:
-            print(f"JSON 解析失敗: {e}")
-
+        else:
+            try:
+                data = resp.json()
+                print("── JSON 結構分析 ──")
+                inspect(data)
+            except Exception as e:
+                print("JSON 解析失敗: " + str(e))
     except Exception as e:
-        print(f"請求失敗: {e}")
-
+        print("請求失敗: " + str(e))
     time.sleep(2)
 
-print("\n" + "=" * 60)
+print("")
+print("=" * 60)
 print("測試完成。")
