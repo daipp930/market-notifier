@@ -28,8 +28,11 @@ from google.genai import types
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
+    stream=sys.stdout,    # ← 強制輸出到 stdout
+    force=True,
 )
-logger = logging.getLogger(__name__)
+# 強制 stdout 不緩衝
+sys.stdout.reconfigure(line_buffering=True)
 
 RECORDS_FILE = "cn_records.json"
 PRIMARY_MODEL = "gemini-2.5-flash"
