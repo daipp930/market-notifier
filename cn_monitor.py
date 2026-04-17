@@ -258,7 +258,7 @@ def send_telegram(text: str, bot_token: str, chat_id: str) -> None:
     chunks = [text[i:i + MESSAGE_LIMIT] for i in range(0, len(text), MESSAGE_LIMIT)]
     for chunk in chunks:
         try:
-            resp = requests.post(api_url, json={"chat_id": chat_id, "text": chunk}, timeout=60)
+            resp = requests.post(api_url, json={"chat_id": chat_id, "text": chunk}, timeout=30)
             resp.raise_for_status()
             time.sleep(1)
         except Exception as exc:
