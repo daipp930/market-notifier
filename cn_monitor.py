@@ -25,6 +25,8 @@ import akshare as ak
 from google import genai
 from google.genai import types
 
+import sys
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
