@@ -143,13 +143,6 @@ def save_records(path: str, data: list) -> None:
 
 # ── 深交所抓取（POST JSON API，你親測有效版本）──────────────────────────────
 def fetch_szse_announcements() -> list[dict]:
-    """
-    直接呼叫深交所後端 POST JSON API。
-    端點：http://www.szse.cn/api/disc/announcement/annList?random=0.123456
-    Payload：channelCode / pageNum / pageSize / searchKey
-    回傳的公告列表位於 data["data"] 陣列內。
-    提取欄位：secCode（證券代碼）、secName（證券簡稱）、title（公告標題）
-    """
     headers = {
         "Content-Type": "application/json",
         "Referer":      "http://www.szse.cn/disclosure/listed/notice/index.html",
@@ -180,18 +173,17 @@ def fetch_szse_announcements() -> list[dict]:
             )
             resp.raise_for_status()
 
-            raw_text = resp.text.strip()
-            if not raw_text or raw_text == "null":
-                logger.info("深交所 API 回傳空結果。")
-                return announcements
-
+            # ✅ 修正：直接解析 JSON，不對回傳物件呼叫 .strip()
             data = resp.json()
 
-            rows: list = []
-            if isinstance(data, dict) and "data" in data and isinstance(data["data"], list):
-                rows = data["data"]
-            elif isinstance(data, list):
+            # ✅ 修正：API 可能直接回傳 list，也可能包在 {"data": [...]} 裡
+            if isinstance(data, list):
                 rows = data
+            elif isinstance(data, dict):
+                rows = data.get("data") or []
+            else:
+                logger.warning("未知的回傳格式，跳過。")
+                return announcements
 
             logger.info("深交所 API 回傳 %d 筆。", len(rows))
 
@@ -205,7 +197,6 @@ def fetch_szse_announcements() -> list[dict]:
 
                 if not sec_code or not title:
                     continue
-
                 if sec_code in seen_codes:
                     continue
                 seen_codes.add(sec_code)
@@ -218,7 +209,7 @@ def fetch_szse_announcements() -> list[dict]:
                 })
                 logger.info("符合條件：[%s] %s — %s", sec_code, sec_name, title)
 
-            return announcements  # 成功即返回
+            return announcements  # ✅ 成功即返回，不繼續重試
 
         except requests.exceptions.JSONDecodeError as exc:
             logger.warning("JSON 解析失敗 (嘗試 %d): %s", attempt + 1, exc)
