@@ -1,80 +1,148 @@
+test_sse
 """
-臨時測試腳本：不做任何篩選，直接印出上交所 API 回傳的原始結構。
-確認 API 可連線、欄位名稱正確後即可刪除此檔案。
+test_sse.py
+臨時診斷腳本：測試上交所各 API 端點的連線狀況與回傳結構。
+確認後請刪除此檔案。
 """
+
 import time
 import json
 import requests
 
 headers = {
-    "Referer":    "https://www.sse.com.cn/",
-    "User-Agent": (
+    "Referer":          "https://www.sse.com.cn/",
+    "User-Agent":       (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/120.0.0.0 Safari/537.36"
     ),
-    "Accept": "*/*",
-    "Accept-Language": "zh-CN,zh;q=0.9",
+    "Accept":           "application/json, text/javascript, */*; q=0.01",
+    "Accept-Language":  "zh-CN,zh;q=0.9",
+    "X-Requested-With": "XMLHttpRequest",
 }
 
-# 測試端點一：queryCompanyBulletin.do（原本腳本使用的）
-url1 = "https://query.sse.com.cn/security/stock/queryCompanyBulletin.do"
-params1 = {
-    "isPagination":       "true",
-    "keyWord":            "发行H股",
-    "pageHelp.pageSize":  25,
-    "pageHelp.pageNo":    1,
-    "pageHelp.beginPage": 1,
-    "pageHelp.endPage":   5,
-}
+# ── 三個待測端點 ────────────────────────────────────────────────────────────────
 
-# 測試端點二：infodisclosure/queryTmp.do（不加日期限制）
-url2 = "https://query.sse.com.cn/infodisclosure/queryTmp.do"
-params2 = {
-    "isPagination":       "true",
-    "keyWord":            "发行H股",
-    "pageHelp.pageSize":  25,
-    "pageHelp.pageNo":    1,
-    "pageHelp.beginPage": 1,
-    "pageHelp.endPage":   5,
-    "_":                  int(time.time() * 1000),
-}
+endpoints = [
+    {
+        "label":  "端點一：queryCompanyBulletin.do（原本腳本）",
+        "method": "GET",
+        "url":    "https://query.sse.com.cn/security/stock/queryCompanyBulletin.do",
+        "params": {
+            "isPagination":       "true",
+            "keyWord":            "发行H股",
+            "pageHelp.pageSize":  25,
+            "pageHelp.pageNo":    1,
+            "pageHelp.beginPage": 1,
+            "pageHelp.endPage":   5,
+        },
+        "json": None,
+    },
+    {
+        "label":  "端點二：searchResult.do（主站搜尋）",
+        "method": "GET",
+        "url":    "https://www.sse.com.cn/home/search/searchResult.do",
+        "params": {
+            "siteid":  "hscdb",
+            "adminid": "hscdb_sseproduct",
+            "q":       "发行H股",
+            "rows":    30,
+            "start":   0,
+            "sort":    "relevant",
+        },
+        "json": None,
+    },
+    {
+        "label":  "端點三：disclosure/listedinfo GET",
+        "method": "GET",
+        "url":    "https://query.sse.com.cn/commonSoaQuery.do",
+        "params": {
+            "sqlId":             "COMMON_SSE_CP_XXPL_GGSZ_L",
+            "isPagination":      "true",
+            "pageHelp.pageNo":   1,
+            "pageHelp.pageSize": 25,
+            "NOTICE_TITLE":      "发行H股",
+        },
+        "json": None,
+    },
+]
 
-for label, url, params in [("端點一", url1, params1), ("端點二", url2, params2)]:
-    print(f"\n{'='*50}")
-    print(f"測試 {label}: {url}")
+# ── 輔助函數：遞迴展示 JSON 結構 ───────────────────────────────────────────────
+
+def inspect(data, depth=0, max_depth=4):
+    indent = "  " * depth
+    if depth > max_depth:
+        print(f"{indent}（層級過深，截斷）")
+        return
+
+    if isinstance(data, dict):
+        print(f"{indent}dict，Keys: {list(data.keys())}")
+        for k, v in data.items():
+            print(f"{indent}  [{k}]：", end="")
+            if isinstance(v, list):
+                print(f"list，共 {len(v)} 筆")
+                if v and isinstance(v[0], dict):
+                    print(f"{indent}    第一筆欄位：{list(v[0].keys())}")
+                    print(f"{indent}    第一筆內容：")
+                    print(json.dumps(v[0], ensure_ascii=False, indent=2)
+                          .replace("\n", f"\n{indent}    "))
+            elif isinstance(v, dict):
+                print(f"dict")
+                inspect(v, depth + 2)
+            else:
+                val_str = str(v)
+                print(val_str[:120] + ("…" if len(val_str) > 120 else ""))
+    elif isinstance(data, list):
+        print(f"{indent}直接是 list，共 {len(data)} 筆")
+        if data and isinstance(data[0], dict):
+            print(f"{indent}  第一筆欄位：{list(data[0].keys())}")
+            print(f"{indent}  第一筆內容：")
+            print(json.dumps(data[0], ensure_ascii=False, indent=2))
+    else:
+        print(f"{indent}{type(data).__name__}: {str(data)[:200]}")
+
+
+# ── 主測試迴圈 ─────────────────────────────────────────────────────────────────
+
+for ep in endpoints:
+    print("\n" + "=" * 60)
+    print(f"測試 {ep['label']}")
+    print(f"URL: {ep['url']}")
     try:
-        resp = requests.get(url, params=params, headers=headers, timeout=30)
+        if ep["method"] == "GET":
+            resp = requests.get(
+                ep["url"],
+                params=ep["params"],
+                headers=headers,
+                timeout=30,
+            )
+        else:
+            resp = requests.post(
+                ep["url"],
+                json=ep["json"],
+                headers=headers,
+                timeout=30,
+            )
+
         print(f"HTTP 狀態碼: {resp.status_code}")
-        print(f"原始回應前 500 字:\n{resp.text[:500]}")
+        print(f"原始回應前 600 字:\n{resp.text[:600]}")
+        print()
+
+        if resp.status_code != 200:
+            print("非 200，跳過 JSON 解析。")
+            continue
+
         try:
             data = resp.json()
-            print(f"JSON 型態: {type(data)}")
-            if isinstance(data, list):
-                print(f"直接是陣列，共 {len(data)} 筆")
-                if data:
-                    print(f"第一筆的欄位名稱: {list(data[0].keys())}")
-                    print(f"第一筆內容:\n{json.dumps(data[0], ensure_ascii=False, indent=2)}")
-            elif isinstance(data, dict):
-                print(f"字典的頂層 Keys: {list(data.keys())}")
-                # 嘗試找資料陣列
-                for key in ["data", "result", "pageHelp"]:
-                    if key in data:
-                        val = data[key]
-                        if isinstance(val, list):
-                            print(f"data['{key}'] 是陣列，共 {len(val)} 筆")
-                            if val:
-                                print(f"第一筆欄位: {list(val[0].keys())}")
-                                print(f"第一筆:\n{json.dumps(val[0], ensure_ascii=False, indent=2)}")
-                        elif isinstance(val, dict):
-                            print(f"data['{key}'] 是字典，Keys: {list(val.keys())}")
-                            inner = val.get("data", [])
-                            if isinstance(inner, list):
-                                print(f"data['{key}']['data'] 共 {len(inner)} 筆")
-                                if inner:
-                                    print(f"第一筆欄位: {list(inner[0].keys())}")
-                                    print(f"第一筆:\n{json.dumps(inner[0], ensure_ascii=False, indent=2)}")
+            print("── JSON 結構分析 ──")
+            inspect(data)
         except Exception as e:
             print(f"JSON 解析失敗: {e}")
+
     except Exception as e:
         print(f"請求失敗: {e}")
+
+    time.sleep(2)
+
+print("\n" + "=" * 60)
+print("測試完成。")
