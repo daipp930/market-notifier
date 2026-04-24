@@ -10,10 +10,12 @@ import json
 import logging
 import sys
 import time
+import concurrent.futures  # ← 加在這裡
 from datetime import date, timedelta
 from pathlib import Path
 
 import akshare as ak
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -48,29 +50,45 @@ def is_target(notice_type: str, title: str) -> bool:
     return any(inc in title for inc in INCLUDE_KEYWORDS)
 
 
+# ↓ 刪掉原本這整個 function，換成下面的版本
+
 def fetch_day(day_str: str) -> list:
     for attempt in range(3):
         try:
-            df = ak.stock_notice_report(symbol="全部", date=day_str)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(
+                    ak.stock_notice_report, symbol="全部", date=day_str
+                )
+                try:
+                    df = future.result(timeout=30)  # 最多等 30 秒
+                except concurrent.futures.TimeoutError:
+                    logger.warning("抓取 %s 超時（第 %d 次），跳過", day_str, attempt + 1)
+                    if attempt < 2:
+                        time.sleep(5)
+                    continue
+
             if df is None or df.empty:
                 return []
+
             results = []
             for _, row in df.iterrows():
                 notice_type = str(row.get("公告类型", ""))
-                title       = str(row.get("公告标题", ""))
-                code        = str(row.get("代码", "")).strip()
-                name        = str(row.get("名称", "")).strip()
+                title = str(row.get("公告标题", ""))
+                code = str(row.get("代码", "")).strip()
+                name = str(row.get("名称", "")).strip()
                 if not is_target(notice_type, title):
                     continue
                 if not code or not code.startswith(("6", "0", "3")):
                     continue
                 results.append((code, name))
             return results
+
         except Exception as exc:
             logger.error("抓取 %s 失敗（第 %d 次）：%s", day_str, attempt + 1, exc)
             if attempt < 2:
                 time.sleep(5)
     return []
+
 
 
 def main():
