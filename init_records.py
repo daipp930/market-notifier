@@ -75,8 +75,19 @@ def fetch_day(day_str: str) -> list:
 
 def main():
     if Path(RECORDS_FILE).exists():
-        logger.warning("%s 已存在，跳過初始化。若需重新初始化請先刪除該檔案。", RECORDS_FILE)
-        return
+        try:
+            with open(RECORDS_FILE, "r", encoding="utf-8") as fh:
+                existing = json.load(fh)
+            if isinstance(existing, dict) and len(existing) > 0:
+                logger.warning(
+                    "%s 已存在且有 %d 筆紀錄，跳過初始化。若需重新初始化請先清空該檔案。",
+                    RECORDS_FILE, len(existing)
+                )
+                return
+            else:
+                logger.info("%s 存在但內容為空，繼續執行初始化。", RECORDS_FILE)
+        except Exception as exc:
+            logger.warning("讀取 %s 失敗（%s），繼續執行初始化。", RECORDS_FILE, exc)
 
     records: dict[str, str] = {}
     current = START_DATE
