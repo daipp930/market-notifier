@@ -187,40 +187,25 @@ def model_request(prompt: str, api_key: str) -> str:
 def generate_report(name: str, code: str, exchange: str, api_key: str) -> str:
     prompt = (
         f"請用 Google Search 搜尋 A 股上市公司「{name}」（股票代碼：{code}，交易所：{exchange}）的資料，"
-        f"並用繁體中文撰寫一份簡報，必須包含：\n"
-        f"1. 公司主營業務及行業地位（2-3句）\n"
-        f"2. 近期財務亮點（最近一個完整財年，包含營收及盈利概況）\n"
-        f"3. 為何此時籌劃發行H股赴港上市的可能原因分析\n"
-        f"4. 對香港資本市場的潛在影響\n\n"
-        f"格式要求：每段以粗體標題開始，結尾必須是「呈批。」"
+        f"用繁體中文，嚴格按以下格式輸出，不得增加任何其他內容：\n\n"
+        f"「{name}」成立於XXXX年，該司主營[一句話描述主營業務及行業地位]。\n\n"
+        f"該司擬發行H股股票並在香港聯交所[主板/GEM]上市，"
+        f"[最新完整財年，如2025年]全年營業額為CNY XX.XX億元，"
+        f"為境外IPO目標戶，具業務拓展潛力，擬拓展該戶境外IPO業務。\n\n"
+        f"呈批。\n\n"
+        f"注意：營業額必須使用最新完整財年的全年數字（非半年度）；"
+        f"上市板塊請根據公司規模及公告內容填寫主板或GEM，如不確定則填主板。"
     )
     fallback = (
-        f"【{name}（{code}）· {exchange}】\n"
-        f"正在籌劃發行H股並申請在香港聯合交易所上市。\n"
-        f"（Gemini 未能生成詳細報告，請查閱相關公告。）\n呈批。"
+        f"「{name}」，該司擬發行H股股票並在香港聯交所上市。\n\n"
+        f"該司為境外IPO目標戶，具業務拓展潛力，擬拓展該戶境外IPO業務。\n\n"
+        f"呈批。"
     )
+
     for attempt in range(2):
         raw = model_request(prompt, api_key)
         if not raw:
             return fallback
-        lines = [l.strip() for l in raw.splitlines() if l.strip()]
-        start = None
-        for i, line in enumerate(lines):
-            if name[:4] in line or "公司簡介" in line or "概況" in line:
-                start = i
-                break
-        if start is not None:
-            body = []
-            for line in lines[start:]:
-                body.append(line)
-                if "呈批。" in line:
-                    break
-            if len(body) >= 2:
-                if not any("呈批。" in l for l in body):
-                    body.append("呈批。")
-                report = "\n".join(body)
-                if report.rstrip().endswith("呈批。"):
-                    return report
         if "呈批。" in raw:
             idx = raw.rfind("呈批。")
             report = raw[:idx + 3].strip()
@@ -229,7 +214,6 @@ def generate_report(name: str, code: str, exchange: str, api_key: str) -> str:
         logger.warning("結尾防截斷失敗（第 %d 次），重試。", attempt + 1)
         time.sleep(3)
     return fallback
-
 
 # ── Telegram ──────────────────────────────────────────────────────────────
 
