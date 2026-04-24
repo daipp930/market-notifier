@@ -1,9 +1,7 @@
 name: CN Monitor (Daily)
 
 on:
-  schedule:
-    - cron: '15,45 1-9 * * 1-5'
-  workflow_dispatch:
+   workflow_dispatch:
 
 permissions:
   contents: write
