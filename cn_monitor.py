@@ -183,45 +183,46 @@ def model_request(prompt: str, api_key: str) -> str:
         logger.warning("模型 %s 全部失敗，切換下一個。", model)
     return ""
 
-
 def generate_report(name: str, code: str, exchange: str, api_key: str) -> str:
     prompt = (
-        f"請用 Google Search 搜尋 A 股上市公司「{name}」（股票代碼：{code}，交易所：{exchange}）的資料，"
-        f"用繁體中文，嚴格按以下格式輸出，不得增加任何其他內容：\n\n"
-        f"「{name}」成立於XXXX年，該司主營[一句話描述主營業務及行業地位]。\n\n"
-        f"該司擬發行H股股票並在香港聯交所[主板/GEM/其他]上市，"
-        f"[最新完整財年，如2025年]全年營業額為CNY XX.XX億元，"
-        f"為境外IPO目標戶，具業務拓展潛力，擬拓展該戶境外IPO業務。\n\n"
-        f"呈批。\n\n"
-        f"注意：\n"
-        f"1. 必須使用最新完整財年的全年營業額，不得使用半年度數字。\n"
-        f"2. 上市板塊若無法確定，不要硬猜，可寫「申請於香港聯交所上市」。\n"
-        f"3. 只輸出兩段正文加結尾，不得加入額外分析、標題或項目符號。"
+        f"用繁體中文，嚴格只輸出以下兩段，無標題、無符號、無分析：\n\n"
+        f"「{name}」成立於XXXX年，該司主營[主營業務一句話]。\n\n"
+        f"該司擬發行H股股票並在香港聯交所上市，[最新完整財年]全年營業額為CNY XX.XX億元，為境外IPO目標戶，具業務拓展潛力，擬拓展該戶境外IPO業務。\n\n"
+        f"呈批。"
     )
 
     fallback = (
-        f"「{name}」成立於XXXX年，該司主營[請補充公司主營業務及行業地位]。\n\n"
-        f"該司擬發行H股股票並在香港聯交所上市，"
-        f"[最新完整財年]全年營業額為CNY XX.XX億元，"
+        f"「{name}」成立於XXXX年，該司主營[請補充主營業務]。\n\n"
+        f"該司擬發行H股股票並在香港聯交所上市，[最新完整財年]全年營業額為CNY XX.XX億元，"
         f"為境外IPO目標戶，具業務拓展潛力，擬拓展該戶境外IPO業務。\n\n"
         f"呈批。"
     )
 
-    for attempt in range(2):
+    for attempt in range(3):  # 增加到 3 次重試
         raw = model_request(prompt, api_key)
         if not raw:
-            return fallback
+            continue
 
+        # 強化防截斷：檢查是否包含關鍵元素
+        if "營業額" not in raw or "CNY" not in raw:
+            logger.warning("第 %d 次：缺少營業額資訊，重試。", attempt + 1)
+            time.sleep(3)
+            continue
+
+        # 取到「呈批。」為止
         if "呈批。" in raw:
             idx = raw.rfind("呈批。")
             report = raw[:idx + 3].strip()
-            if report.rstrip().endswith("呈批。"):
+            
+            # 確保有兩段（用 \n\n 分隔）
+            if report.count('\n\n') >= 1 and report.rstrip().endswith("呈批。"):
                 return report
 
-        logger.warning("結尾防截斷失敗（第 %d 次），重試。", attempt + 1)
+        logger.warning("第 %d 次格式不符，重試。", attempt + 1)
         time.sleep(3)
 
     return fallback
+
 
 
 # ── Telegram ──────────────────────────────────────────────────────────────
