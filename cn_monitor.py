@@ -189,16 +189,21 @@ def generate_report(name: str, code: str, exchange: str, api_key: str) -> str:
         f"請用 Google Search 搜尋 A 股上市公司「{name}」（股票代碼：{code}，交易所：{exchange}）的資料，"
         f"用繁體中文，嚴格按以下格式輸出，不得增加任何其他內容：\n\n"
         f"「{name}」成立於XXXX年，該司主營[一句話描述主營業務及行業地位]。\n\n"
-        f"該司擬發行H股股票並在香港聯交所[主板/GEM]上市，"
+        f"該司擬發行H股股票並在香港聯交所[主板/GEM/其他]上市，"
         f"[最新完整財年，如2025年]全年營業額為CNY XX.XX億元，"
         f"為境外IPO目標戶，具業務拓展潛力，擬拓展該戶境外IPO業務。\n\n"
         f"呈批。\n\n"
-        f"注意：營業額必須使用最新完整財年的全年數字（非半年度）；"
-        f"上市板塊請根據公司規模及公告內容填寫主板或GEM，如不確定則填主板。"
+        f"注意：\n"
+        f"1. 必須使用最新完整財年的全年營業額，不得使用半年度數字。\n"
+        f"2. 上市板塊若無法確定，不要硬猜，可寫「申請於香港聯交所上市」。\n"
+        f"3. 只輸出兩段正文加結尾，不得加入額外分析、標題或項目符號。"
     )
+
     fallback = (
-        f"「{name}」，該司擬發行H股股票並在香港聯交所上市。\n\n"
-        f"該司為境外IPO目標戶，具業務拓展潛力，擬拓展該戶境外IPO業務。\n\n"
+        f"「{name}」成立於XXXX年，該司主營[請補充公司主營業務及行業地位]。\n\n"
+        f"該司擬發行H股股票並在香港聯交所上市，"
+        f"[最新完整財年]全年營業額為CNY XX.XX億元，"
+        f"為境外IPO目標戶，具業務拓展潛力，擬拓展該戶境外IPO業務。\n\n"
         f"呈批。"
     )
 
@@ -206,14 +211,18 @@ def generate_report(name: str, code: str, exchange: str, api_key: str) -> str:
         raw = model_request(prompt, api_key)
         if not raw:
             return fallback
+
         if "呈批。" in raw:
             idx = raw.rfind("呈批。")
             report = raw[:idx + 3].strip()
             if report.rstrip().endswith("呈批。"):
                 return report
+
         logger.warning("結尾防截斷失敗（第 %d 次），重試。", attempt + 1)
         time.sleep(3)
+
     return fallback
+
 
 # ── Telegram ──────────────────────────────────────────────────────────────
 
