@@ -275,35 +275,43 @@ def extract_report_body(raw: str, company_name: str, fallback: str) -> str:
 
 
 def generate_report(company_name: str, api_key: str) -> str:
-    prompt = f"""你是一位專業財經分析師。請使用 Google Search 搜尋以下公司的背景資料：
-
-公司名稱：{company_name}
-
-請查找以下資訊：
-1. 成立年份
-2. 主要業務（簡短描述，不超過 30 字）
-3. 最新財務年月（例如 2024/12）
-4. 最新年度營業額（請標明幣種，例如 CNY 9.2 億）
-
-若找不到某項確切數字，請填「招股書待披露」，絕對不可自行估計或捏造數據。
-只輸出以下三行，不要加任何額外說明或前言，最後一行必須是「呈批。」：
-
-「{company_name}」成立於[成立年份]年，該司主營[業務內容]。
-該司已在香港聯交所主板上市遞交A1 form，[最新財務年月]營業額為[最新營業額]，為境外IPO目標戶，具業務拓展潛力，擬拓展該戶境外IPO業務。
-呈批。"""
+    prompt = (
+        f"用繁體中文，嚴格只輸出以下兩段正文加結尾，無標題、無符號、無額外說明：\n\n"
+        f"「{company_name}」成立於XXXX年，該司主營[主營業務一句話]。\n\n"
+        f"該司擬在香港聯交所[主板/GEM]上市並遞交A1申請表，"
+        f"[最新完整財年，如2025年]全年營業額為[幣種] XX.XX億元，"
+        f"為境外IPO目標戶，具業務拓展潛力，擬拓展該戶境外IPO業務。\n\n"
+        f"呈批。\n\n"
+        f"⚠️ 嚴格要求：\n"
+        f"1. 營業額必須使用最新完整財年的全年數字，格式為「CNY/HKD/USD XX.XX億元」，不得使用半年度或估算值。\n"
+        f"2. 若確實找不到營業額，填「招股書待披露」。\n"
+        f"3. 上市板塊根據公司規模判斷填主板或GEM，不確定填主板。\n"
+        f"4. 只輸出兩段正文，最後一行必須是「呈批。」"
+    )
 
     fallback = (
-        f"「{company_name}」成立於招股書待披露年，該司主營招股書待披露。\n"
-        f"該司已在香港聯交所主板上市遞交A1 form，招股書待披露營業額為招股書待披露，"
-        f"為境外IPO目標戶，具業務拓展潛力，擬拓展該戶境外IPO業務。\n"
+        f"「{company_name}」，該司主營業務待披露。\n\n"
+        f"該司擬在香港聯交所上市並遞交A1申請表，"
+        f"全年營業額為招股書待披露，"
+        f"為境外IPO目標戶，具業務拓展潛力，擬拓展該戶境外IPO業務。\n\n"
         f"呈批。"
     )
 
-    raw = model_request(prompt, api_key)
-    if not raw:
-        return fallback
-    return extract_report_body(raw, company_name, fallback)
+    for attempt in range(3):
+        raw = model_request(prompt, api_key)
+        if not raw:
+            continue
 
+        if "呈批。" in raw:
+            idx = raw.rfind("呈批。")
+            report = raw[:idx + 3].strip()
+            if report.count('\n\n') >= 1 and report.rstrip().endswith("呈批。"):
+                return report
+
+        logger.warning("第 %d 次格式不符，重試。", attempt + 1)
+        time.sleep(3)
+
+    return fallback
 
 # ── 主程式 ─────────────────────────────────────────────────────────────────────
 def main():
